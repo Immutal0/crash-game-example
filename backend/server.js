@@ -44,8 +44,42 @@ mongoose.connect(
   {
     useNewUrlParser: true,
     useUnifiedTopology: true,
+    useCreateIndex: true,
   },
 );
+
+const db = mongoose.connection
+db.on("error", (error) => console.error(error))
+db.once("open", () => console.log("Connected to Database"))
+
+// Initialize Game_loop document if it doesn't exist
+const initializeGameLoop = async () => {
+  try {
+    let gameLoop = await Game_loop.findById(GAME_LOOP_ID);
+    if (!gameLoop) {
+      gameLoop = new Game_loop({
+        _id: GAME_LOOP_ID,
+        round_number: 1,
+        active_player_id_list: [],
+        multiplier_crash: 0,
+        b_betting_phase: false,
+        b_game_phase: false,
+        b_cashout_phase: false,
+        time_now: -1,
+        previous_crashes: [2.00, 1.50, 3.20, 1.20, 4.50], // Initial history
+        round_id_list: [1, 2, 3, 4, 5], // Initial round IDs
+        chat_messages_list: []
+      });
+      await gameLoop.save();
+      console.log('Game loop initialized successfully');
+    }
+  } catch (error) {
+    console.error('Error initializing game loop:', error);
+  }
+};
+
+// Call initialization
+initializeGameLoop();
 
 console.log("okhere");
 
@@ -385,14 +419,23 @@ const loopUpdate = async () => {
       cashout()
       sent_cashout = true
       right_now = Date.now()
-      const update_loop = await Game_loop.findById(GAME_LOOP_ID)
-      await update_loop.updateOne({ $push: { previous_crashes: game_crash_value } })
-      await update_loop.updateOne({ $unset: { "previous_crashes.0": 1 } })
-      await update_loop.updateOne({ $pull: { "previous_crashes": null } })
-      const the_round_id_list = update_loop.round_id_list
-      await update_loop.updateOne({ $push: { round_id_list: the_round_id_list[the_round_id_list.length - 1] + 1 } })
-      await update_loop.updateOne({ $unset: { "round_id_list.0": 1 } })
-      await update_loop.updateOne({ $pull: { "round_id_list": null } })
+      try {
+        const update_loop = await Game_loop.findById(GAME_LOOP_ID)
+        if (!update_loop) {
+          console.error('Game loop document not found');
+          return;
+        }
+        await update_loop.updateOne({ $push: { previous_crashes: game_crash_value } })
+        await update_loop.updateOne({ $unset: { "previous_crashes.0": 1 } })
+        await update_loop.updateOne({ $pull: { "previous_crashes": null } })
+        const the_round_id_list = update_loop.round_id_list || []
+        const nextRoundId = the_round_id_list.length > 0 ? the_round_id_list[the_round_id_list.length - 1] + 1 : 1
+        await update_loop.updateOne({ $push: { round_id_list: nextRoundId } })
+        await update_loop.updateOne({ $unset: { "round_id_list.0": 1 } })
+        await update_loop.updateOne({ $pull: { "round_id_list": null } })
+      } catch (error) {
+        console.error('Error updating game loop:', error);
+      }
     }
 
     if (time_elapsed > 3) {
@@ -410,13 +453,21 @@ const loopUpdate = async () => {
         game_crash_value = Math.round(game_crash_value * 100) / 100
       }
       io.emit('update_user')
-      let theLoop = await Game_loop.findById(GAME_LOOP_ID)
-      io.emit('crash_history', theLoop.previous_crashes)
-      io.emit('get_round_id_list', theLoop.round_id_list)
-      io.emit('start_betting_phase')
-      io.emit('testingvariable')
-      live_bettors_table = []
-      phase_start_time = Date.now()
+      try {
+        let theLoop = await Game_loop.findById(GAME_LOOP_ID)
+        if (!theLoop) {
+          console.error('Game loop document not found');
+          return;
+        }
+        io.emit('crash_history', theLoop.previous_crashes || [])
+        io.emit('get_round_id_list', theLoop.round_id_list || [])
+        io.emit('start_betting_phase')
+        io.emit('testingvariable')
+        live_bettors_table = []
+        phase_start_time = Date.now()
+      } catch (error) {
+        console.error('Error fetching game loop:', error);
+      }
     }
   }
 }

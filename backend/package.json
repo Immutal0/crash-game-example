@@ -30,6 +30,6 @@
     "statman-stopwatch": "^2.13.0"
   },
   "devDependencies": {
-    "nodemon": "^3.1.7"
+    "nodemon": "^3.1.9"
   }
 }
