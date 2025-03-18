@@ -28,10 +28,10 @@ A recreation of the popular online casino game "crash" with accurate casino odds
 
 ## Installation 
     // Clone the repository
-    $ git clone https://github.com/wbrandon25/Online-Crash-Gambling-Simulator
+    $ git clone https://github.com/Immutal0/crash-game-example.git
     
     // Navigate to directory
-    $ cd ./Online-Crash-Gambling-Simulator
+    $ cd ./crash-game-example
 
 ### Setup and Run Client
 
